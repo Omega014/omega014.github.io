@@ -16,6 +16,45 @@
   </script>
 
 
+
+
+
+
+
+
+<script type="text/javascript">
+  //<![CDATA[
+  const target = document.getElementById('click-test');
+  
+  // addEventListener('click', の前に実行してください。
+  click_test();
+  
+  target.addEventListener('click', function() {
+      console.log('Clickされました');
+  }, false);
+  
+  // クリック時にKARTE側に飛んで欲しいvaluesを入れる
+  function click_test() {
+    tracker.link('#kartetest', {
+      event_name: 'click_check',
+      title: 'clickテスト',
+      clicksuccess: 'success'
+    });
+  }
+  //]]>
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
 </head>
 
 <body>
@@ -68,6 +107,11 @@
 
   </article>
 </body>
+
+
+<div id="content">
+    <var>content</var> <a href="https://omega021.jimdofree.com/" id="kartetest" name="kartetest">021へ飛びます</a>
+</div>
 
 <footer>
   <a href='http://www.ospn.jp/' title='オープンソースカンファレンス'><img src='http://www.ospn.jp/bn/OSC2019.jpg' /></a>

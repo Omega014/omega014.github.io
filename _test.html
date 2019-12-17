@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>test</title>
+  <script type="text/javascript">(function(){var t,e,n,r,a;for(t=function(){var t;return t=[],function(){var e,n,r,a;for(n=["init","start","stop","user","track","action","event","goal","chat","buy","page","view","admin","group","alias","ready","link","form","click","submit","cmd","emit","on","send","css","js","style","option","get","set","collection","link"],e=function(e){return function(){return t.push([e].concat(Array.prototype.slice.call(arguments,0)))}},r=0,a=[];r<n.length;)t[n[r]]=e(n[r]),a.push(r++);return a}(),t.init=function(e,n){var r,a;return t.api_key=e,t.options=n||{},a=document.createElement("script"),a.type="text/javascript",a.async=!0,a.charset="utf-8",a.src=t.options.tracker_url||"http://localhost:8020/node_modules/tracker.js/build/build.js",r=document.getElementsByTagName("script")[0],r.parentNode.insertBefore(a,r)},t},r=window.karte_tracker_names||["tracker"],e=0,n=r.length;n>e;e++)a=r[e],window[a]||(window[a]=t());tracker.init("fe6abf89b1d9be7bf4e07dfab2412986",{
+    // ローカル環境用
+      track_url: 'http://localhost:8010/track', // トラッキング先
+      admin_url: 'http://localhost:8020', // 管理画面
+      // http_only: true,
+      tracker_url: './build/build.js'
+      // subdomain: false
+      // domain: 'test.kate.cname'
+    })}).call(this);
+  </script>
+</head>
+<body>
+  <a href="https://omega021.jimdofree.com/">Go to https://omega021.jimdofree.com/</a>
+</body>
+</html>

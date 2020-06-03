@@ -1360,7 +1360,7 @@ code .jquery_var { color: #D70; } /* $container */
 
 code .infinite-scroll { text-decoration: underline; }
 
-/* web fonts
+/* weｂ
 ------------------------- */
 
 @import url("//hello.myfonts.net/count/2d333f");
@@ -1374,8 +1374,6 @@ code .infinite-scroll { text-decoration: underline; }
   font-family: 'Texta';
   font-weight: bold;
   font-style: normal;
-  src: url('../fonts/2D333F_0_0.woff2') format('woff2'),
-    url('../fonts/2D333F_0_0.woff') format('woff');
 }
 
 /* Texta Italic */
@@ -1383,15 +1381,12 @@ code .infinite-scroll { text-decoration: underline; }
   font-family: 'Texta';
   font-weight: normal;
   font-style: italic;
-  src: url('../fonts/2D333F_1_0.woff2') format('woff2'),
-    url('../fonts/2D333F_1_0.woff') format('woff');
 }
 
 /* Texta Regular */
 @font-face {
   font-family: 'Texta';
-  src: url('../fonts/2D333F_2_0.woff2') format('woff2'),
-    url('../fonts/2D333F_2_0.woff') format('woff');
+
 }
 
 .masonry-small .image-grid__item {

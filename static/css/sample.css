@@ -1,0 +1,36 @@
+@charset "utf-8";
+
+body {
+	margin: 0;
+	padding: 0;
+}
+ul {
+	margin: 0;
+	padding-left: 0;
+}
+li {
+	list-style: none;
+}
+.back {
+	position: fixed;
+	bottom: 10px;
+	right: 10px;
+}
+
+.list {
+	width: 1050px;
+	overflow: hidden;
+	margin: 0 auto;
+}
+.list__item {
+	float: left;
+	width: 320px;
+	margin: 15px;
+}
+.list__item img {
+	width: 100%;
+	height: auto;
+}
+.pager {
+	text-align: center;
+}

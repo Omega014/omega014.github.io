@@ -8,6 +8,7 @@ const ctx = canvas.getContext('2d');
 
 let width, height, centerX, fireBaseY;
 let flameTongues = [];
+let flameSparks = [];
 let coreFlames = [];
 let embers = [];
 let stars = [];
@@ -315,6 +316,19 @@ function drawLogs() {
       ctx.fill();
     }
 
+    // --- 薪の表面熱ゆらぎ ---
+    for (let i = 0; i < 3; i++) {
+      const hx = (i - 1) * halfLen * 0.5;
+      const hy = -hw * 0.3;
+      const hr = (8 + i * 3) * s;
+      const hPulse = 0.08 + Math.sin(time * 0.05 + log.seed + i * 2.1) * 0.05
+                    + Math.sin(time * 0.09 + i * 3.7) * 0.03;
+      ctx.beginPath();
+      ctx.ellipse(hx, hy + Math.sin(time * 0.03 + i) * 2, hr, hr * 0.4, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 140, 40, ${hPulse * log.charLevel})`;
+      ctx.fill();
+    }
+
     ctx.restore(); // clip解除
 
     // --- 丸太の断面（端） ---
@@ -366,6 +380,40 @@ function drawLogs() {
   }
 }
 
+// --- 薪の交差部分の発光スポット ---
+
+function drawInterLogEmbers() {
+  const s = scale;
+  const spots = [
+    { x: -20 * s, y: 22 * s },
+    { x: 15 * s, y: 25 * s },
+    { x: -5 * s, y: 30 * s },
+    { x: 30 * s, y: 20 * s },
+    { x: -35 * s, y: 28 * s },
+  ];
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < spots.length; i++) {
+    const sp = spots[i];
+    const x = centerX + sp.x;
+    const y = fireBaseY + sp.y;
+    const r = (10 + Math.sin(time * 0.06 + i * 1.4) * 3) * s;
+    const pulse = 0.15 + Math.sin(time * 0.04 + i * 2.3) * 0.08
+                + Math.sin(time * 0.11 + i * 0.9) * 0.05;
+
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, `rgba(255, 220, 120, ${pulse * fireIntensity})`);
+    grad.addColorStop(0.4, `rgba(255, 150, 50, ${pulse * 0.5 * fireIntensity})`);
+    grad.addColorStop(1, 'rgba(255, 80, 20, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 // --- 炎の舌（ベジェ曲線で有機的な形状） ---
 
 class FlameTongue {
@@ -385,21 +433,33 @@ class FlameTongue {
     this.wobbleSpeed = rand(0.06, 0.15);
     this.wobbleAmt = rand(5, 20) * s * fireIntensity;
     this.lean = rand(-0.3, 0.3);
-    this.layer = rand(0, 1); // 0=奥 1=手前
+    this.layer = rand(0, 1);
+    this.tipSharpness = rand(0.15, 0.45);
+    this.fadeIn = 0;
+    // 多周波タービュランス用パラメータ
+    this.turbFreq1 = rand(0.02, 0.04);
+    this.turbFreq2 = rand(0.07, 0.12);
+    this.turbFreq3 = rand(0.18, 0.3);
+    this.turbPhase = rand(0, Math.PI * 2);
   }
 
   update() {
     this.wobble += this.wobbleSpeed;
     this.life -= this.decay;
+    if (this.fadeIn < 1) this.fadeIn = Math.min(1, this.fadeIn + 0.05);
     if (this.life <= 0) this.reset();
   }
 
   draw() {
     if (this.life <= 0) return;
-    const alpha = clamp(this.life, 0, 1);
+    const alpha = clamp(this.life, 0, 1) * this.fadeIn;
     const s = scale;
 
-    const wobbleX = Math.sin(this.wobble) * this.wobbleAmt;
+    // 多周波タービュランス: 低速うねり + 中速揺れ + 高速振動
+    const turb1 = Math.sin(time * this.turbFreq1 + this.turbPhase) * this.wobbleAmt * 1.2;
+    const turb2 = Math.sin(time * this.turbFreq2 + this.turbPhase + 1.5) * this.wobbleAmt * 0.6;
+    const turb3 = Math.sin(time * this.turbFreq3 + this.turbPhase + 3.0) * this.wobbleAmt * 0.25;
+    const wobbleX = turb1 + turb2 + turb3;
     const wobbleX2 = Math.sin(this.wobble * 1.3 + 1) * this.wobbleAmt * 0.5;
 
     const bx = this.baseX;
@@ -407,16 +467,25 @@ class FlameTongue {
     const tipX = bx + wobbleX + this.lean * this.height;
     const tipY = by - this.height * this.life;
     const w = this.width * Math.pow(this.life, 0.3);
+    const tipW = w * this.tipSharpness;
 
-    // 炎の舌をベジェ曲線で描画
+    // 炎の舌をベジェ曲線で描画（cubic）
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    // 外側の炎（赤〜オレンジ）
+    // 外側の炎（赤〜オレンジ）— cubic bezier
     ctx.beginPath();
     ctx.moveTo(bx - w, by);
-    ctx.quadraticCurveTo(bx - w * 0.8 + wobbleX2, by - this.height * 0.4, tipX, tipY);
-    ctx.quadraticCurveTo(bx + w * 0.8 + wobbleX2, by - this.height * 0.4, bx + w, by);
+    ctx.bezierCurveTo(
+      bx - w * 0.9 + wobbleX2 * 0.3, by - this.height * 0.25,
+      bx - tipW + wobbleX * 0.7, by - this.height * 0.65,
+      tipX, tipY
+    );
+    ctx.bezierCurveTo(
+      bx + tipW + wobbleX * 0.7, by - this.height * 0.65,
+      bx + w * 0.9 + wobbleX2 * 0.3, by - this.height * 0.25,
+      bx + w, by
+    );
     ctx.closePath();
 
     const outerGrad = ctx.createLinearGradient(bx, by, tipX, tipY);
@@ -427,12 +496,21 @@ class FlameTongue {
     ctx.fillStyle = outerGrad;
     ctx.fill();
 
-    // 中間の炎（オレンジ〜黄色）
+    // 中間の炎（オレンジ〜黄色）— cubic bezier
     const mw = w * 0.6;
+    const mtipW = mw * this.tipSharpness;
     ctx.beginPath();
     ctx.moveTo(bx - mw, by);
-    ctx.quadraticCurveTo(bx - mw * 0.6 + wobbleX * 0.8, by - this.height * 0.45, tipX, tipY + this.height * 0.15);
-    ctx.quadraticCurveTo(bx + mw * 0.6 + wobbleX * 0.8, by - this.height * 0.45, bx + mw, by);
+    ctx.bezierCurveTo(
+      bx - mw * 0.7 + wobbleX * 0.4, by - this.height * 0.3,
+      bx - mtipW + wobbleX * 0.6, by - this.height * 0.6,
+      tipX, tipY + this.height * 0.15
+    );
+    ctx.bezierCurveTo(
+      bx + mtipW + wobbleX * 0.6, by - this.height * 0.6,
+      bx + mw * 0.7 + wobbleX * 0.4, by - this.height * 0.3,
+      bx + mw, by
+    );
     ctx.closePath();
 
     const midGrad = ctx.createLinearGradient(bx, by, tipX, tipY);
@@ -443,12 +521,21 @@ class FlameTongue {
     ctx.fillStyle = midGrad;
     ctx.fill();
 
-    // 芯の炎（白〜黄白）
+    // 芯の炎（白〜黄白）— cubic bezier
     const iw = w * 0.25;
+    const itipW = iw * this.tipSharpness;
     ctx.beginPath();
     ctx.moveTo(bx - iw, by);
-    ctx.quadraticCurveTo(bx - iw * 0.3 + wobbleX * 0.5, by - this.height * 0.3, tipX, tipY + this.height * 0.35);
-    ctx.quadraticCurveTo(bx + iw * 0.3 + wobbleX * 0.5, by - this.height * 0.3, bx + iw, by);
+    ctx.bezierCurveTo(
+      bx - iw * 0.4 + wobbleX * 0.2, by - this.height * 0.2,
+      bx - itipW + wobbleX * 0.4, by - this.height * 0.45,
+      tipX, tipY + this.height * 0.35
+    );
+    ctx.bezierCurveTo(
+      bx + itipW + wobbleX * 0.4, by - this.height * 0.45,
+      bx + iw * 0.4 + wobbleX * 0.2, by - this.height * 0.2,
+      bx + iw, by
+    );
     ctx.closePath();
 
     const innerGrad = ctx.createLinearGradient(bx, by, tipX, tipY + this.height * 0.35);
@@ -462,6 +549,47 @@ class FlameTongue {
   }
 }
 
+// --- 炎の火花（FlameSpark） ---
+
+class FlameSpark {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    const s = scale;
+    this.x = centerX + rand(-35, 35) * s;
+    this.y = fireBaseY - rand(40, 120) * s * fireIntensity;
+    this.vx = rand(-1.5, 1.5);
+    this.vy = rand(-2.5, -0.8) * s;
+    this.life = 1;
+    this.decay = rand(0.02, 0.06);
+    this.size = rand(0.5, 2) * s;
+    this.color = Math.random() < 0.5 ? 'yellow' : 'orange';
+  }
+
+  update() {
+    this.x += this.vx + Math.sin(time * 0.08 + this.x * 0.02) * 0.3;
+    this.y += this.vy;
+    this.vy -= 0.005 * scale;
+    this.life -= this.decay;
+    if (this.life <= 0) this.reset();
+  }
+
+  draw() {
+    if (this.life <= 0) return;
+    const alpha = clamp(this.life, 0, 1);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    if (this.color === 'yellow') {
+      ctx.fillStyle = `rgba(255, 255, 100, ${alpha * 0.8})`;
+    } else {
+      ctx.fillStyle = `rgba(255, 180, 50, ${alpha * 0.8})`;
+    }
+    ctx.fill();
+  }
+}
+
 // --- 根元の熾火（おきび）グロー ---
 
 function drawEmberBed() {
@@ -469,19 +597,36 @@ function drawEmberBed() {
   const bedY = fireBaseY + 25 * s;
   const rng = seededRandom(999);
 
-  // 赤熱した炭のベッド
-  for (let i = 0; i < 20; i++) {
+  // 赤熱した炭のベッド — 温度バリエーション: 白熱(15%) / オレンジ(35%) / 暗赤(50%)
+  for (let i = 0; i < 25; i++) {
     const ex = centerX + (rng() - 0.5) * 120 * s;
     const ey = bedY + (rng() - 0.5) * 20 * s;
     const er = rng() * 12 * s + 5 * s;
     const pulse = (0.3 + Math.sin(time * 0.03 + i * 0.7) * 0.15
                 + Math.sin(time * 0.07 + i * 1.3) * 0.1) * fireIntensity;
 
+    const tempRoll = rng();
     const emberGrad = ctx.createRadialGradient(ex, ey, 0, ex, ey, er);
-    emberGrad.addColorStop(0, `rgba(255, 180, 60, ${pulse * 0.5})`);
-    emberGrad.addColorStop(0.3, `rgba(255, 100, 20, ${pulse * 0.3})`);
-    emberGrad.addColorStop(0.6, `rgba(200, 50, 5, ${pulse * 0.15})`);
-    emberGrad.addColorStop(1, 'rgba(100, 20, 0, 0)');
+
+    if (tempRoll < 0.15) {
+      // 白熱（最も熱い）
+      emberGrad.addColorStop(0, `rgba(255, 255, 200, ${pulse * 0.6})`);
+      emberGrad.addColorStop(0.3, `rgba(255, 230, 120, ${pulse * 0.4})`);
+      emberGrad.addColorStop(0.6, `rgba(255, 180, 60, ${pulse * 0.2})`);
+      emberGrad.addColorStop(1, 'rgba(255, 120, 20, 0)');
+    } else if (tempRoll < 0.5) {
+      // オレンジ（中温）
+      emberGrad.addColorStop(0, `rgba(255, 180, 60, ${pulse * 0.5})`);
+      emberGrad.addColorStop(0.3, `rgba(255, 100, 20, ${pulse * 0.3})`);
+      emberGrad.addColorStop(0.6, `rgba(200, 50, 5, ${pulse * 0.15})`);
+      emberGrad.addColorStop(1, 'rgba(100, 20, 0, 0)');
+    } else {
+      // 暗赤（冷めかけ）
+      emberGrad.addColorStop(0, `rgba(200, 60, 10, ${pulse * 0.35})`);
+      emberGrad.addColorStop(0.3, `rgba(150, 30, 5, ${pulse * 0.2})`);
+      emberGrad.addColorStop(0.6, `rgba(100, 15, 0, ${pulse * 0.1})`);
+      emberGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
+    }
 
     ctx.fillStyle = emberGrad;
     ctx.beginPath();
@@ -627,7 +772,6 @@ class SpeechCloud {
     this.wobble += this.wobbleSpeed;
 
     if (this.phase === 'appear') {
-      // 0〜0.5秒: その場でふわっとフェードイン
       const t = Math.min(this.phaseTime / 0.5, 1);
       this.alpha = t * 0.6;
       this.x = this.targetX + Math.sin(this.wobble) * 5;
@@ -637,7 +781,6 @@ class SpeechCloud {
         this.phaseTime = 0;
       }
     } else if (this.phase === 'float') {
-      // 0.5〜1.5秒（1.0秒間）: ゆらゆら漂う
       this.x = this.targetX + Math.sin(this.wobble) * 10;
       this.y += this.floatVy + Math.cos(this.wobble * 0.7) * 0.3;
       this.alpha = 0.6;
@@ -648,15 +791,13 @@ class SpeechCloud {
         this.flyStartY = this.y;
       }
     } else if (this.phase === 'fly') {
-      // 1.5秒〜: 炎の中心に向かってゆったり移動
       const t = Math.min(this.phaseTime / 1.5, 1);
-      const ease = t * t; // 緩やかな加速
+      const ease = t * t;
       this.x = lerp(this.flyStartX, centerX, ease);
       this.y = lerp(this.flyStartY, fireBaseY, ease);
-      this.size = this.originalSize * (1 - ease * 0.7); // 縮小
+      this.size = this.originalSize * (1 - ease * 0.7);
       this.alpha = 0.6 * (1 - t * t);
 
-      // 炎に到達
       if (t >= 1) {
         fireIntensity = clamp(fireIntensity + 0.15, 0.3, 2.0);
         this.dead = true;
@@ -698,26 +839,39 @@ function drawFireGlow() {
   const f1 = Math.sin(time * 0.07) * 8 + Math.sin(time * 0.11) * 5;
   const f2 = Math.sin(time * 0.09) * 4;
 
+  // 色温度のゆるやかな変動
+  const tempShift = Math.sin(time * 0.015) * 0.5 + 0.5; // 0-1
+  const rBase = Math.floor(lerp(255, 255, tempShift));
+  const gBase = Math.floor(lerp(140, 180, tempShift));
+  const bBase = Math.floor(lerp(40, 80, tempShift));
+
+  // アルファ値のダイナミックなフリッカー
+  const flickerAlpha = 1 + Math.sin(time * 0.13) * 0.15 + Math.sin(time * 0.23) * 0.1;
+
+  // グロー中心のわずかなシフト
+  const glowCX = centerX + Math.sin(time * 0.02) * 5 * s;
+  const glowCY = fireBaseY + Math.cos(time * 0.025) * 3 * s;
+
   const envR = 400 * s * fireIntensity + f1;
-  const envGlow = ctx.createRadialGradient(centerX, fireBaseY, 10 * s, centerX, fireBaseY, envR);
-  envGlow.addColorStop(0, 'rgba(255, 160, 60, 0.10)');
-  envGlow.addColorStop(0.2, 'rgba(255, 120, 40, 0.06)');
-  envGlow.addColorStop(0.4, 'rgba(255, 80, 20, 0.03)');
-  envGlow.addColorStop(0.7, 'rgba(200, 40, 0, 0.01)');
+  const envGlow = ctx.createRadialGradient(glowCX, glowCY, 10 * s, glowCX, glowCY, envR);
+  envGlow.addColorStop(0, `rgba(${rBase}, ${gBase}, ${bBase}, ${0.10 * flickerAlpha})`);
+  envGlow.addColorStop(0.2, `rgba(255, 120, 40, ${0.06 * flickerAlpha})`);
+  envGlow.addColorStop(0.4, `rgba(255, 80, 20, ${0.03 * flickerAlpha})`);
+  envGlow.addColorStop(0.7, `rgba(200, 40, 0, ${0.01 * flickerAlpha})`);
   envGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = envGlow;
   ctx.beginPath();
-  ctx.arc(centerX, fireBaseY, envR, 0, Math.PI * 2);
+  ctx.arc(glowCX, glowCY, envR, 0, Math.PI * 2);
   ctx.fill();
 
   const coreR = 120 * s * fireIntensity + f2;
-  const coreGlow = ctx.createRadialGradient(centerX, fireBaseY + 10 * s, 0, centerX, fireBaseY + 10 * s, coreR);
-  coreGlow.addColorStop(0, 'rgba(255, 200, 100, 0.18)');
-  coreGlow.addColorStop(0.3, 'rgba(255, 150, 50, 0.10)');
+  const coreGlow = ctx.createRadialGradient(glowCX, glowCY + 10 * s, 0, glowCX, glowCY + 10 * s, coreR);
+  coreGlow.addColorStop(0, `rgba(255, 200, 100, ${0.18 * flickerAlpha})`);
+  coreGlow.addColorStop(0.3, `rgba(255, 150, 50, ${0.10 * flickerAlpha})`);
   coreGlow.addColorStop(1, 'rgba(255, 100, 20, 0)');
   ctx.fillStyle = coreGlow;
   ctx.beginPath();
-  ctx.arc(centerX, fireBaseY + 10 * s, coreR, 0, Math.PI * 2);
+  ctx.arc(glowCX, glowCY + 10 * s, coreR, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -725,10 +879,13 @@ function drawFireGlow() {
 
 function drawHeatShimmer() {
   const s = scale;
-  for (let i = 0; i < 5; i++) {
-    const x = centerX + Math.sin(time * 0.02 + i * 1.3) * 30 * s;
-    const y = fireBaseY - (120 + i * 15) * s;
-    const alpha = 0.015 - i * 0.002;
+  const shimmerScale = 0.7 + fireIntensity * 0.6;
+  for (let i = 0; i < 8; i++) {
+    const xOff = Math.sin(time * 0.02 + i * 1.3) * 30 * s
+               + Math.cos(time * 0.035 + i * 0.9) * 15 * s;
+    const x = centerX + xOff;
+    const y = fireBaseY - (120 + i * 12) * s;
+    const alpha = (0.018 - i * 0.002) * shimmerScale;
     ctx.beginPath();
     ctx.arc(x, y, rand(15, 25) * s, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255, 200, 150, ${Math.max(0, alpha)})`;
@@ -738,7 +895,8 @@ function drawHeatShimmer() {
 
 // --- パーティクル初期化 ---
 
-const FLAME_TONGUE_COUNT = 18;
+const FLAME_TONGUE_COUNT = 24;
+const FLAME_SPARK_COUNT = 50;
 const EMBER_COUNT = 25;
 const SMOKE_COUNT = 12;
 
@@ -747,7 +905,14 @@ function initParticles() {
   for (let i = 0; i < FLAME_TONGUE_COUNT; i++) {
     const f = new FlameTongue();
     f.life = Math.random();
+    f.fadeIn = 1;
     flameTongues.push(f);
+  }
+  flameSparks = [];
+  for (let i = 0; i < FLAME_SPARK_COUNT; i++) {
+    const sp = new FlameSpark();
+    sp.life = Math.random();
+    flameSparks.push(sp);
   }
   embers = [];
   for (let i = 0; i < EMBER_COUNT; i++) {
@@ -900,10 +1065,16 @@ function draw() {
 
   drawLogs();
 
+  // 薪の交差部分の発光
+  drawInterLogEmbers();
+
   // 炎の舌
   // 奥のレイヤーを先に描画
   const sortedFlames = [...flameTongues].sort((a, b) => a.layer - b.layer);
   for (const f of sortedFlames) { f.update(); f.draw(); }
+
+  // 炎の火花
+  for (const sp of flameSparks) { sp.update(); sp.draw(); }
 
   // 火の粉
   for (const e of embers) { e.update(); e.draw(); }
@@ -916,9 +1087,19 @@ function draw() {
 initParticles();
 draw();
 
-document.addEventListener('click', () => {
-  if (!audioCtx) {
-    initAudio();
-    startSpeechDetection();
+function onUserInteraction() {
+  if (audioCtx) return;
+  initAudio();
+  // iOS Safari: AudioContext が suspended の場合 resume する
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
   }
-}, { once: true });
+  startSpeechDetection();
+  const hint = document.getElementById('tapHint');
+  if (hint) hint.style.display = 'none';
+  document.removeEventListener('click', onUserInteraction);
+  document.removeEventListener('touchstart', onUserInteraction);
+}
+
+document.addEventListener('click', onUserInteraction);
+document.addEventListener('touchstart', onUserInteraction);

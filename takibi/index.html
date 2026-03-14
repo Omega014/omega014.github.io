@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Takibi - 焚き火</title>
   <style>
     * {
@@ -16,16 +16,57 @@
       overflow: hidden;
       cursor: default;
       user-select: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      position: fixed;
+      width: 100%;
+      height: 100%;
     }
 
     canvas {
       display: block;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tap-hint {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 200, 150, 0.7);
+      font-family: monospace;
+      font-size: 14px;
+      z-index: 10;
+      animation: pulse 2s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    .nav-link {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      color: rgba(255, 200, 150, 0.6);
+      font-family: monospace;
+      font-size: 14px;
+      text-decoration: none;
+      z-index: 10;
+      transition: color 0.3s;
+    }
+
+    .nav-link:hover {
+      color: rgba(255, 200, 150, 1);
     }
   </style>
 </head>
 <body>
+  <a class="nav-link" href="/takibi-pixcel/pixel.html">pixel mode</a>
+  <div class="tap-hint" id="tapHint">tap to start</div>
   <canvas id="fireCanvas"></canvas>
   <script src="app.js"></script>
 </body>

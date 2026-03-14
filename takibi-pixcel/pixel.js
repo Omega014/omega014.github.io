@@ -187,6 +187,55 @@ function drawSky() {
   }
 }
 
+// --- 流れ星 ---
+let shootingStar = null;
+let nextShootingStarTime = time + Math.floor(rand(300, 900));
+
+function updateAndDrawShootingStar() {
+  // 出現タイミング
+  if (!shootingStar && time >= nextShootingStarTime) {
+    const startX = Math.floor(rand(20, W - 20));
+    const startY = Math.floor(rand(3, 25));
+    const angle = rand(0.3, 0.8) * (Math.random() < 0.5 ? 1 : -1);
+    shootingStar = {
+      x: startX,
+      y: startY,
+      vx: Math.cos(angle) * rand(2.5, 4),
+      vy: Math.sin(Math.abs(angle)) * rand(1.5, 3),
+      life: 1,
+      decay: rand(0.025, 0.045),
+      tailLen: Math.floor(rand(5, 10)),
+    };
+  }
+
+  if (!shootingStar) return;
+
+  const s = shootingStar;
+
+  // 尾を描画（古い位置から現在位置へ）
+  for (let i = s.tailLen; i >= 0; i--) {
+    const t = i / s.tailLen;
+    const px = Math.floor(s.x - s.vx * i * 0.6);
+    const py = Math.floor(s.y - s.vy * i * 0.6);
+    const a = Math.floor(s.life * (1 - t) * 220);
+    if (a > 10) {
+      setPixel(px, py, 255, 255, 240, a);
+    }
+  }
+  // 先端を明るく
+  setPixel(Math.floor(s.x), Math.floor(s.y), 255, 255, 255, Math.floor(s.life * 255));
+
+  // 更新
+  s.x += s.vx;
+  s.y += s.vy;
+  s.life -= s.decay;
+
+  if (s.life <= 0 || s.x < -10 || s.x > W + 10 || s.y > 60) {
+    shootingStar = null;
+    nextShootingStarTime = time + Math.floor(rand(300, 900));
+  }
+}
+
 // --- 描画: 星 ---
 function drawStars() {
   for (const star of stars) {
@@ -195,6 +244,7 @@ function drawStars() {
       setPalettePixel(star.x, star.y, 15, Math.floor(alpha * 200));
     }
   }
+  updateAndDrawShootingStar();
 }
 
 // --- 描画: 地面 ---

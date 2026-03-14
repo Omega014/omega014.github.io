@@ -247,6 +247,61 @@ function drawStars() {
   updateAndDrawShootingStar();
 }
 
+// --- ヘビ ---
+let snake = null;
+let nextSnakeTime = time + Math.floor(rand(600, 1500));
+
+function updateAndDrawSnake() {
+  if (!snake && time >= nextSnakeTime) {
+    const goRight = Math.random() < 0.5;
+    snake = {
+      x: goRight ? -12 : W + 12,
+      y: 115 + Math.floor(rand(0, 18)),
+      vx: goRight ? rand(0.4, 0.8) : rand(-0.8, -0.4),
+      segLen: Math.floor(rand(8, 13)),
+      phase: rand(0, Math.PI * 2),
+      freq: rand(0.12, 0.2),
+      amp: rand(1.5, 3),
+      bodyColor: Math.random() < 0.5 ? [40, 70, 30] : [55, 45, 30],
+    };
+  }
+
+  if (!snake) return;
+
+  const s = snake;
+
+  // 体節を描画（尾→頭）
+  for (let i = s.segLen; i >= 0; i--) {
+    const t = i / s.segLen;
+    const sx = s.x - s.vx * i * 2.2;
+    const sy = s.y + Math.sin(s.phase + i * 0.6) * s.amp;
+    const px = Math.floor(sx);
+    const py = Math.floor(sy);
+
+    if (i === 0) {
+      // 頭（少し大きめ）
+      setPixel(px, py, s.bodyColor[0] + 20, s.bodyColor[1] + 20, s.bodyColor[2] + 15, 230);
+      setPixel(px + (s.vx > 0 ? 1 : -1), py, s.bodyColor[0] + 20, s.bodyColor[1] + 20, s.bodyColor[2] + 15, 200);
+      // 目
+      setPixel(px + (s.vx > 0 ? 1 : -1), py - 1, 200, 180, 50, 255);
+    } else {
+      // 胴体（先端にいくほど細い印象 → 尾は薄め）
+      const a = Math.floor(lerp(255, 140, t));
+      setPixel(px, py, s.bodyColor[0], s.bodyColor[1], s.bodyColor[2], a);
+    }
+  }
+
+  // 更新
+  s.x += s.vx;
+  s.phase += s.freq;
+
+  // 画面外に出たら消す
+  if ((s.vx > 0 && s.x > W + 30) || (s.vx < 0 && s.x < -30)) {
+    snake = null;
+    nextSnakeTime = time + Math.floor(rand(600, 1500));
+  }
+}
+
 // --- 描画: 地面 ---
 function drawGround() {
   for (let y = 108; y < H; y++) {
@@ -723,6 +778,9 @@ function draw() {
 
   // 星
   drawStars();
+
+  // ヘビ
+  updateAndDrawSnake();
 
   // 描画
   ctx.putImageData(imageData, 0, 0);
